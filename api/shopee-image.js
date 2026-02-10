@@ -8,10 +8,10 @@ export default async function handler(req, res) {
     let shopid = null;
     let itemid = null;
 
-    // FORMAT 1: /product/shopid/itemid
+    // FORMAT: /product/shopid/itemid
     const productMatch = url.match(/product\/(\d+)\/(\d+)/);
 
-    // FORMAT 2: -i.shopid.itemid
+    // FORMAT: -i.shopid.itemid
     const iMatch = url.match(/i\.(\d+)\.(\d+)/);
 
     if (productMatch) {
@@ -29,20 +29,41 @@ export default async function handler(req, res) {
       });
     }
 
+    // ⚠️ PAKAI HOST & HEADER YANG BENAR
     const apiUrl = `https://shopee.co.id/api/v4/item/get?itemid=${itemid}&shopid=${shopid}`;
 
     const r = await fetch(apiUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'application/json',
+        'Accept-Language': 'id-ID,id;q=0.9',
+        'Referer': 'https://shopee.co.id/',
+        'Origin': 'https://shopee.co.id'
       }
     });
 
     const json = await r.json();
+    const data = json?.data;
 
-    const imageId = json?.data?.image;
+    if (!data) {
+      return res.json({ image: null, error: 'Data kosong dari Shopee' });
+    }
+
+    // 🔥 LOGIC FINAL (INI KUNCINYA)
+    let imageId = null;
+
+    if (data.images && data.images.length > 0) {
+      imageId = data.images[0];
+    } else if (data.image) {
+      imageId = data.image;
+    }
+
     if (!imageId) {
-      return res.json({ image: null, error: 'Image ID tidak ditemukan' });
+      return res.json({
+        image: null,
+        error: 'Image ID tidak tersedia di response',
+        debug: Object.keys(data)
+      });
     }
 
     const imageUrl = `https://down-id.img.susercontent.com/file/${imageId}`;
@@ -56,7 +77,7 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({
       image: null,
-      error: 'Internal error'
+      error: 'Internal server error'
     });
   }
 }
