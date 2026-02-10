@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopee Affiliate Bulk Generator</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+body{font-family:Inter,sans-serif;background:#f4f4f5}
+.shopee-orange{background:#ee4d2d}
+.shopee-text{color:#ee4d2d}
+#preview-card{
+    width:360px;min-height:640px;background:#fff;
+    position:relative;overflow:hidden;
+    box-shadow:0 20px 25px -5px rgba(0,0,0,.1)
+}
+.theme-dark{background:#1a1a1a!important;color:#fff}
+.theme-dark #displayTitle{color:#fff}
+</style>
+</head>
+
+<body class="p-6">
+
+<div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+<!-- INPUT PANEL -->
+<div class="bg-white p-6 rounded-2xl shadow border space-y-4">
+
+<h1 class="text-xl font-bold">Shopee Affiliate Bulk Tool</h1>
+
+<!-- Shopee URL -->
+<input id="shopeeUrlInput"
+       class="w-full border rounded-lg px-3 py-2"
+       placeholder="Paste URL Shopee (ambil gambar utama)">
+
+<!-- CSV -->
+<input type="file" id="csvInput" accept=".csv">
+
+<p class="text-xs text-gray-500">
+CSV format: <b>title,price,link,image</b>
+</p>
+
+<button id="startBulk"
+        class="w-full shopee-orange text-white py-3 rounded-xl font-bold">
+START BULK GENERATE
+</button>
+
+<p id="statusText" class="text-sm text-gray-600"></p>
+
+</div>
+
+<!-- PREVIEW -->
+<div class="flex justify-center">
+<div id="preview-card">
+
+<div class="absolute top-0 left-0 w-full h-28 shopee-orange opacity-10"></div>
+
+<div class="relative z-10 p-6 flex flex-col h-full">
+
+<!-- HEADER -->
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-2">
+        <div class="shopee-orange text-white
+                    w-6 h-6 rounded
+                    flex items-center justify-center
+                    font-extrabold text-sm leading-none">S</div>
+        <span class="font-bold text-sm leading-none">Shopee Haul</span>
+    </div>
+    <div class="bg-gray-100 px-3 py-1 rounded-full text-xs font-bold leading-none">
+        Rekomendasi
+    </div>
+</div>
+
+<!-- IMAGE -->
+<div class="aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4">
+    <img id="productImg"
+         src="https://via.placeholder.com/400x400?text=Image"
+         class="w-full h-full object-cover">
+</div>
+
+<!-- INFO -->
+<h2 id="displayTitle" class="text-xl font-bold mb-2">Nama Produk</h2>
+
+<div class="flex items-baseline gap-1 mb-4">
+    <span class="shopee-text font-semibold">Rp</span>
+    <span id="displayPrice" class="text-4xl font-extrabold shopee-text">0</span>
+</div>
+
+<div class="mt-auto bg-gray-50 border-2 border-dashed rounded-xl p-4 text-center">
+    <p class="text-xs font-bold text-gray-400 mb-1">CEK PRODUK</p>
+    <p id="displayLink" class="font-bold break-all">shope.ee/link</p>
+</div>
+
+</div>
+</div>
+</div>
+
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+// GANTI dengan endpoint kamu
+const SHOPEE_API = '/api/shopee-image';
+
+/* ======================================== */
+
+const productImg = document.getElementById('productImg');
+const displayTitle = document.getElementById('displayTitle');
+const displayPrice = document.getElementById('displayPrice');
+const displayLink = document.getElementById('displayLink');
+const previewCard = document.getElementById('preview-card');
+const statusText = document.getElementById('statusText');
+
+/* === SHOPEE URL → IMAGE === */
+document.getElementById('shopeeUrlInput').addEventListener('change', async e => {
+    const url = e.target.value.trim();
+    if (!url) return;
+
+    statusText.innerText = 'Mengambil gambar dari Shopee...';
+
+    const res = await fetch(`${SHOPEE_API}?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+
+    if (data.image) {
+        productImg.crossOrigin = 'anonymous';
+        productImg.src = data.image;
+        statusText.innerText = 'Gambar berhasil diambil';
+    } else {
+        statusText.innerText = 'Gagal mengambil gambar';
+    }
+});
+
+/* === CSV PARSER === */
+function parseCSV(text){
+    return text.trim().split('\n').slice(1).map(r=>{
+        const [title,price,link,image]=r.split(',');
+        return {title,price,link,image};
+    });
+}
+
+/* === BULK GENERATE === */
+document.getElementById('startBulk').onclick = async () => {
+    const file = document.getElementById('csvInput').files[0];
+    if (!file) return alert('Upload CSV dulu');
+
+    const rows = parseCSV(await file.text());
+    statusText.innerText = `Mulai generate ${rows.length} gambar...`;
+
+    for (let i=0;i<rows.length;i++){
+        const p = rows[i];
+
+        displayTitle.innerText = p.title;
+        displayPrice.innerText = Number(p.price).toLocaleString('id-ID');
+        displayLink.innerText = p.link;
+
+        productImg.crossOrigin='anonymous';
+        productImg.src = p.image;
+
+        await new Promise(r=>setTimeout(r,800));
+
+        const canvas = await html2canvas(previewCard,{scale:3});
+        const a=document.createElement('a');
+        a.download=`shopee-${i+1}.png`;
+        a.href=canvas.toDataURL();
+        a.click();
+
+        statusText.innerText = `Generated ${i+1}/${rows.length}`;
+    }
+
+    statusText.innerText = 'SELESAI ✅';
+};
+</script>
+
+</body>
+</html>
